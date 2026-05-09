@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/3d-force-graph@1"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     background: #08080f;
     color: #e8e8f0;
@@ -19,215 +19,106 @@
     height: 100vh;
   }
 
-  canvas { display: block; cursor: crosshair; }
+  #canvas-2d { display: block; position: fixed; inset: 0; cursor: crosshair; }
+  #container-3d { position: fixed; inset: 0; display: none; }
 
   /* Header */
   #header {
-    position: fixed;
-    top: 28px;
-    left: 36px;
-    pointer-events: none;
-    z-index: 10;
+    position: fixed; top: 28px; left: 36px;
+    pointer-events: none; z-index: 10;
   }
   #header h1 {
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.35);
+    font-size: 13px; font-weight: 500; letter-spacing: 0.18em;
+    text-transform: uppercase; color: rgba(255,255,255,0.35);
   }
   #header p {
-    font-size: 11px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.18);
-    margin-top: 4px;
-    letter-spacing: 0.06em;
+    font-size: 11px; font-weight: 300; color: rgba(255,255,255,0.18);
+    margin-top: 4px; letter-spacing: 0.06em;
   }
 
-  /* Loading overlay */
+  /* Loading */
   #loading {
-    position: fixed;
-    inset: 0;
-    background: #08080f;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    transition: opacity 0.6s ease;
+    position: fixed; inset: 0; background: #08080f;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; z-index: 100; transition: opacity 0.6s ease;
   }
   #loading.fade-out { opacity: 0; pointer-events: none; }
   #loading-label {
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.3);
-    margin-bottom: 24px;
+    font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(255,255,255,0.3); margin-bottom: 24px;
   }
-  #progress-bar {
-    width: 200px;
-    height: 1px;
-    background: rgba(255,255,255,0.08);
-    overflow: hidden;
-  }
-  #progress-fill {
-    height: 100%;
-    background: rgba(255,255,255,0.5);
-    width: 0%;
-    transition: width 0.1s;
-  }
+  #progress-bar { width: 200px; height: 1px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  #progress-fill { height: 100%; background: rgba(255,255,255,0.5); width: 0%; transition: width 0.15s; }
 
-  /* Mode toggle */
-  #mode-toggle {
-    position: fixed;
-    top: 28px;
-    right: 36px;
-    z-index: 10;
-    display: flex;
-    gap: 2px;
+  /* Toolbar (top-right) */
+  #toolbar {
+    position: fixed; top: 28px; right: 36px;
+    z-index: 10; display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+  }
+  .toggle-group {
+    display: flex; gap: 2px;
     background: rgba(255,255,255,0.05);
-    border-radius: 8px;
-    padding: 3px;
+    border-radius: 8px; padding: 3px;
   }
-  #mode-toggle button {
+  .toggle-group button {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 14px;
-    cursor: pointer;
-    background: transparent;
-    color: rgba(255,255,255,0.3);
-    transition: all 0.2s ease;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.1em;
+    text-transform: uppercase; border: none; border-radius: 6px;
+    padding: 6px 14px; cursor: pointer; background: transparent;
+    color: rgba(255,255,255,0.3); transition: all 0.2s ease;
   }
-  #mode-toggle button.active {
+  .toggle-group button.active {
     background: rgba(255,255,255,0.1);
     color: rgba(255,255,255,0.85);
   }
+  #btn-3d.active { color: #00D4FF; }
   #btn-path.active { color: #3CFF8F; }
 
   /* Info panel */
   #info {
-    position: fixed;
-    bottom: 32px;
-    left: 36px;
-    width: 280px;
-    pointer-events: none;
-    z-index: 10;
-    opacity: 0;
-    transform: translateY(8px);
+    position: fixed; bottom: 32px; left: 36px; width: 280px;
+    pointer-events: none; z-index: 10;
+    opacity: 0; transform: translateY(8px);
     transition: opacity 0.25s ease, transform 0.25s ease;
   }
   #info.visible { opacity: 1; transform: translateY(0); }
-  #info-name {
-    font-size: 22px;
-    font-weight: 600;
-    color: #ffffff;
-    line-height: 1;
-    margin-bottom: 8px;
-  }
-  #info-degree {
-    font-size: 12px;
-    font-weight: 400;
-    color: rgba(255,255,255,0.45);
-    letter-spacing: 0.06em;
-    margin-bottom: 4px;
-  }
-  #info-community {
-    font-size: 11px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.25);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .info-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
+  #info-name { font-size: 22px; font-weight: 600; color: #fff; line-height: 1; margin-bottom: 8px; }
+  #info-degree { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.45); letter-spacing: 0.06em; margin-bottom: 4px; }
+  #info-community { font-size: 11px; font-weight: 300; color: rgba(255,255,255,0.25); letter-spacing: 0.08em; text-transform: uppercase; }
+  .info-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 
-  /* Path result panel */
+  /* Path panel */
   #path-panel {
-    position: fixed;
-    bottom: 32px;
-    left: 36px;
-    width: 320px;
-    pointer-events: none;
-    z-index: 10;
-    opacity: 0;
-    transform: translateY(8px);
+    position: fixed; bottom: 32px; left: 36px; width: 320px;
+    pointer-events: none; z-index: 10;
+    opacity: 0; transform: translateY(8px);
     transition: opacity 0.25s ease, transform 0.25s ease;
   }
   #path-panel.visible { opacity: 1; transform: translateY(0); }
-  #path-degrees {
-    font-size: 36px;
-    font-weight: 600;
-    color: #ffffff;
-    line-height: 1;
-    margin-bottom: 6px;
-  }
-  #path-degrees span {
-    font-size: 14px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.4);
-    margin-left: 6px;
-    letter-spacing: 0.06em;
-  }
-  #path-chain {
-    font-size: 11px;
-    font-weight: 400;
-    color: rgba(255,255,255,0.35);
-    letter-spacing: 0.05em;
-    line-height: 1.8;
-    margin-top: 8px;
-    word-break: break-all;
-  }
+  #path-degrees { font-size: 36px; font-weight: 600; color: #fff; line-height: 1; margin-bottom: 6px; }
+  #path-degrees span { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.4); margin-left: 6px; letter-spacing: 0.06em; }
+  #path-chain { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.35); letter-spacing: 0.05em; line-height: 1.8; margin-top: 8px; word-break: break-all; }
   #path-chain .node-source { color: #3CFF8F; font-weight: 600; }
   #path-chain .node-target { color: #FF3D5A; font-weight: 600; }
   #path-chain .node-mid { color: rgba(255,255,255,0.7); }
 
-  /* Path mode prompt */
+  /* Path prompt */
   #path-prompt {
-    position: fixed;
-    bottom: 32px;
-    left: 36px;
-    pointer-events: none;
-    z-index: 10;
-    opacity: 0;
-    transform: translateY(8px);
+    position: fixed; bottom: 32px; left: 36px;
+    pointer-events: none; z-index: 10;
+    opacity: 0; transform: translateY(8px);
     transition: opacity 0.25s ease, transform 0.25s ease;
   }
   #path-prompt.visible { opacity: 1; transform: translateY(0); }
-  #path-prompt-text {
-    font-size: 13px;
-    font-weight: 400;
-    color: rgba(255,255,255,0.3);
-    letter-spacing: 0.06em;
-  }
-  #path-prompt-text strong {
-    color: #3CFF8F;
-    font-weight: 600;
-  }
+  #path-prompt-text { font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.3); letter-spacing: 0.06em; }
+  #path-prompt-text strong { color: #3CFF8F; font-weight: 600; }
 
   /* Hint */
   #hint {
-    position: fixed;
-    bottom: 32px;
-    right: 36px;
-    font-size: 10px;
-    font-weight: 300;
-    letter-spacing: 0.1em;
-    color: rgba(255,255,255,0.15);
-    text-align: right;
-    pointer-events: none;
-    z-index: 10;
-    line-height: 1.8;
+    position: fixed; bottom: 32px; right: 36px;
+    font-size: 10px; font-weight: 300; letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.15); text-align: right;
+    pointer-events: none; z-index: 10; line-height: 1.8;
   }
 </style>
 </head>
@@ -243,39 +134,39 @@
   <p>4,039 people &nbsp;·&nbsp; 88,234 friendships</p>
 </div>
 
-<div id="mode-toggle">
-  <button id="btn-explore" class="active" onclick="setMode('explore')">Explore</button>
-  <button id="btn-path" onclick="setMode('path')">Path</button>
+<div id="toolbar">
+  <div class="toggle-group">
+    <button id="btn-2d" class="active" onclick="setView('2d')">2D</button>
+    <button id="btn-3d" onclick="setView('3d')">3D</button>
+  </div>
+  <div class="toggle-group" id="mode-toggle">
+    <button id="btn-explore" class="active" onclick="setMode('explore')">Explore</button>
+    <button id="btn-path" onclick="setMode('path')">Path</button>
+  </div>
 </div>
 
-<!-- Explore mode info -->
 <div id="info">
   <div id="info-name">Person #0</div>
   <div id="info-degree">0 friends</div>
   <div id="info-community"><span class="info-dot" id="info-dot"></span><span id="info-community-text">—</span></div>
 </div>
 
-<!-- Path mode: prompt -->
 <div id="path-prompt">
   <div id="path-prompt-text">Click a <strong>source</strong> node</div>
 </div>
 
-<!-- Path mode: result -->
 <div id="path-panel">
   <div id="path-degrees">0<span>degrees of separation</span></div>
   <div id="path-chain"></div>
 </div>
 
-<div id="hint">
-  scroll to zoom &nbsp;·&nbsp; drag to pan<br>
-  click a node to highlight friends<br>
-  click background to reset
-</div>
+<div id="hint"></div>
 
-<canvas id="canvas"></canvas>
+<canvas id="canvas-2d"></canvas>
+<div id="container-3d"></div>
 
 <script>
-// ─── Palette ────────────────────────────────────────────────────────────────
+// ─── Palette ─────────────────────────────────────────────────────────────────
 const PALETTE = [
   '#FF3D5A','#FF7A2F','#FFD426','#3CFF8F','#00D4FF',
   '#7B61FF','#FF61DC','#00FF9F','#FF9640','#4DAAFF',
@@ -285,219 +176,88 @@ const PALETTE = [
 const COLOR_SOURCE = '#3CFF8F';
 const COLOR_TARGET = '#FF3D5A';
 const COLOR_MID    = '#ffffff';
+const COLOR_DIM    = '#1a1a2e';
 
-function nodeColor(community) { return PALETTE[community % PALETTE.length]; }
+function communityColor(c) { return PALETTE[c % PALETTE.length]; }
 
-// ─── Canvas setup ──────────────────────────────────────────────────────────
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let W, H;
+// ─── Shared state ─────────────────────────────────────────────────────────────
+let viewMode = '2d';   // '2d' | '3d'
+let mode     = 'explore'; // 'explore' | 'path'
+let nodes2d = [], links2d = []; // owned by D3 — will be mutated
+let nodes3d = [], links3d = []; // owned by ForceGraph3D — kept clean
+let nodeById = new Map();       // indexes into nodes2d for BFS
+let selectedNode = null, neighborSet = new Set();
+let pathSource = null, pathTarget = null;
+let pathNodes = new Set(), pathEdgeSet = new Set(), pathResult = [];
 
-function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
-  ctx.scale(dpr, dpr);
-}
-resize();
-window.addEventListener('resize', () => { resize(); draw(); });
-
-// ─── State ────────────────────────────────────────────────────────────────
-let nodes = [], links = [];
-let nodeById = new Map();
-let simulation;
-let transform = d3.zoomIdentity;
-let quadtree;
-
-// Explore mode
-let selectedNode = null;
-let neighborSet = new Set();
-
-// Path mode
-let mode = 'explore'; // 'explore' | 'path'
-let pathSource = null;
-let pathTarget = null;
-let pathNodes = new Set(); // ids on the path
-let pathEdgeSet = new Set(); // "a-b" keys for path edges
-let pathResult = []; // ordered array of node ids
-
-// ─── Load data ────────────────────────────────────────────────────────────
-fetch('graph.json')
-  .then(r => r.json())
-  .then(data => {
-    nodes = data.nodes;
-    links = data.links;
-    init();
-  });
-
-function init() {
-  nodeById = new Map(nodes.map(n => [n.id, n]));
-
-  nodes.forEach(n => { n.neighbors = []; });
-  links.forEach(l => {
-    const s = nodeById.get(l.source);
-    const t = nodeById.get(l.target);
-    if (s && t) { s.neighbors.push(t.id); t.neighbors.push(s.id); }
-  });
-
-  const maxDeg = d3.max(nodes, d => d.degree);
-  nodes.forEach(n => { n.r = 2 + 8 * Math.sqrt(n.degree / maxDeg); });
-
-  simulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(12).strength(0.4))
-    .force('charge', d3.forceManyBody().strength(-60).distanceMax(200))
-    .force('center', d3.forceCenter(W / 2, H / 2))
-    .force('collision', d3.forceCollide(d => d.r + 1))
-    .alphaDecay(0.02)
-    .on('tick', () => { updateProgress(); draw(); })
-    .on('end', () => {
-      setProgress(100);
-      setTimeout(() => {
-        document.getElementById('loading').classList.add('fade-out');
-        buildQuadtree();
-      }, 300);
-    });
-}
-
-// ─── Progress ────────────────────────────────────────────────────────────
-let alpha0 = null;
-function updateProgress() {
-  const a = simulation.alpha();
-  if (alpha0 === null) alpha0 = a;
-  setProgress(Math.min(99, Math.round((1 - a / alpha0) * 100)));
-}
-function setProgress(v) { document.getElementById('progress-fill').style.width = v + '%'; }
-
-// ─── Quadtree ────────────────────────────────────────────────────────────
-function buildQuadtree() {
-  quadtree = d3.quadtree().x(d => d.x).y(d => d.y).addAll(nodes);
-}
-function findNearest(mx, my, radius = 20) {
-  return quadtree ? quadtree.find(mx, my, radius) : null;
-}
-
-// ─── Mode toggle ─────────────────────────────────────────────────────────
-function setMode(m) {
-  mode = m;
-  document.getElementById('btn-explore').classList.toggle('active', m === 'explore');
-  document.getElementById('btn-path').classList.toggle('active', m === 'path');
-
-  // reset both modes
-  selectedNode = null; neighborSet.clear();
-  pathSource = null; pathTarget = null;
-  pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
-
-  updateHint();
-  updatePanels();
-  draw();
-}
-
-function updateHint() {
-  const hint = document.getElementById('hint');
-  if (mode === 'explore') {
-    hint.innerHTML = 'scroll to zoom &nbsp;·&nbsp; drag to pan<br>click a node to highlight friends<br>click background to reset';
-  } else {
-    hint.innerHTML = 'scroll to zoom &nbsp;·&nbsp; drag to pan<br>click two nodes to find the path<br>click background to reset';
-  }
-}
-
-// ─── BFS shortest path ───────────────────────────────────────────────────
+// ─── BFS ──────────────────────────────────────────────────────────────────────
 function bfs(srcId, tgtId) {
   if (srcId === tgtId) return [srcId];
-  const visited = new Map(); // id -> parent id
-  visited.set(srcId, null);
+  const visited = new Map([[srcId, null]]);
   const queue = [srcId];
   while (queue.length) {
     const cur = queue.shift();
-    const node = nodeById.get(cur);
-    for (const nbId of node.neighbors) {
-      if (!visited.has(nbId)) {
-        visited.set(nbId, cur);
-        if (nbId === tgtId) {
-          // reconstruct path
+    for (const nb of nodeById.get(cur).neighbors) {
+      if (!visited.has(nb)) {
+        visited.set(nb, cur);
+        if (nb === tgtId) {
           const path = [];
-          let c = nbId;
+          let c = nb;
           while (c !== null) { path.unshift(c); c = visited.get(c); }
           return path;
         }
-        queue.push(nbId);
+        queue.push(nb);
       }
     }
   }
-  return null; // no path
+  return null;
 }
 
-// ─── Zoom / Pan ──────────────────────────────────────────────────────────
-const zoom = d3.zoom()
-  .scaleExtent([0.05, 12])
-  .on('zoom', e => { transform = e.transform; draw(); });
-d3.select(canvas).call(zoom);
-
-// ─── Click ──────────────────────────────────────────────────────────────
-canvas.addEventListener('click', e => {
-  const rect = canvas.getBoundingClientRect();
-  const mx = transform.invertX(e.clientX - rect.left);
-  const my = transform.invertY(e.clientY - rect.top);
-  const hit = findNearest(mx, my, 20 / transform.k);
-
+// ─── Click logic (shared) ─────────────────────────────────────────────────────
+function handleNodeClick(node) {
   if (mode === 'explore') {
-    if (hit) {
-      if (selectedNode === hit) {
-        selectedNode = null; neighborSet.clear();
-      } else {
-        selectedNode = hit;
-        neighborSet = new Set(hit.neighbors);
-      }
-    } else {
+    if (selectedNode && selectedNode.id === node.id) {
       selectedNode = null; neighborSet.clear();
+    } else {
+      selectedNode = node;
+      neighborSet = new Set(node.neighbors);
     }
   } else {
-    // Path mode
-    if (!hit) {
-      pathSource = null; pathTarget = null;
+    if (!pathSource) {
+      pathSource = node; pathTarget = null;
       pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
-    } else if (!pathSource) {
-      pathSource = hit;
-      pathTarget = null;
-      pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
-    } else if (hit === pathSource) {
-      // clicking source again resets
+    } else if (node.id === pathSource.id) {
       pathSource = null; pathTarget = null;
       pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
     } else {
-      pathTarget = hit;
+      pathTarget = node;
       const path = bfs(pathSource.id, pathTarget.id);
       pathResult = path || [];
       pathNodes = new Set(pathResult);
       pathEdgeSet.clear();
       for (let i = 0; i < pathResult.length - 1; i++) {
-        const a = pathResult[i], b = pathResult[i + 1];
+        const a = pathResult[i], b = pathResult[i+1];
         pathEdgeSet.add(Math.min(a,b) + '-' + Math.max(a,b));
       }
     }
   }
-
   updatePanels();
-  draw();
-});
+  refreshActive();
+}
 
-// ─── Hover cursor ────────────────────────────────────────────────────────
-canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  const mx = transform.invertX(e.clientX - rect.left);
-  const my = transform.invertY(e.clientY - rect.top);
-  canvas.style.cursor = findNearest(mx, my, 20 / transform.k) ? 'pointer' : 'crosshair';
-});
+function handleReset() {
+  selectedNode = null; neighborSet.clear();
+  pathSource = null; pathTarget = null;
+  pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
+  updatePanels();
+  refreshActive();
+}
 
-// ─── Panels ──────────────────────────────────────────────────────────────
+// ─── Panels ───────────────────────────────────────────────────────────────────
 function updatePanels() {
-  const infoEl = document.getElementById('info');
+  const infoEl   = document.getElementById('info');
   const promptEl = document.getElementById('path-prompt');
-  const panelEl = document.getElementById('path-panel');
+  const panelEl  = document.getElementById('path-panel');
 
   if (mode === 'explore') {
     promptEl.classList.remove('visible');
@@ -505,7 +265,7 @@ function updatePanels() {
     if (selectedNode) {
       document.getElementById('info-name').textContent = `Person #${selectedNode.id}`;
       document.getElementById('info-degree').textContent = `${selectedNode.degree} friend${selectedNode.degree !== 1 ? 's' : ''}`;
-      document.getElementById('info-dot').style.background = nodeColor(selectedNode.community);
+      document.getElementById('info-dot').style.background = communityColor(selectedNode.community);
       document.getElementById('info-community-text').textContent = `Cluster ${selectedNode.community}`;
       infoEl.classList.add('visible');
     } else {
@@ -513,16 +273,13 @@ function updatePanels() {
     }
   } else {
     infoEl.classList.remove('visible');
-
     if (!pathSource) {
       document.getElementById('path-prompt-text').innerHTML = 'Click a <strong>source</strong> node';
-      promptEl.classList.add('visible');
-      panelEl.classList.remove('visible');
+      promptEl.classList.add('visible'); panelEl.classList.remove('visible');
     } else if (!pathTarget) {
       document.getElementById('path-prompt-text').innerHTML =
         `<strong style="color:#3CFF8F">Person #${pathSource.id}</strong> selected — now click a <strong>target</strong>`;
-      promptEl.classList.add('visible');
-      panelEl.classList.remove('visible');
+      promptEl.classList.add('visible'); panelEl.classList.remove('visible');
     } else {
       promptEl.classList.remove('visible');
       if (pathResult.length === 0) {
@@ -532,163 +289,347 @@ function updatePanels() {
         const deg = pathResult.length - 1;
         document.getElementById('path-degrees').innerHTML =
           `${deg}<span>degree${deg !== 1 ? 's' : ''} of separation</span>`;
-
-        const chainParts = pathResult.map((id, i) => {
+        const parts = pathResult.map((id, i) => {
           if (i === 0) return `<span class="node-source">#${id}</span>`;
           if (i === pathResult.length - 1) return `<span class="node-target">#${id}</span>`;
           return `<span class="node-mid">#${id}</span>`;
         });
-        document.getElementById('path-chain').innerHTML = chainParts.join(' &rarr; ');
+        document.getElementById('path-chain').innerHTML = parts.join(' &rarr; ');
       }
       panelEl.classList.add('visible');
     }
   }
 }
 
-// ─── Draw ────────────────────────────────────────────────────────────────
-function draw() {
+function updateHint() {
+  const nav = viewMode === '2d'
+    ? 'scroll to zoom &nbsp;·&nbsp; drag to pan'
+    : 'drag to rotate &nbsp;·&nbsp; scroll to zoom';
+  const action = mode === 'explore'
+    ? 'click a node to highlight friends<br>click background to reset'
+    : 'click two nodes to find the path<br>click background to reset';
+  document.getElementById('hint').innerHTML = nav + '<br>' + action;
+}
+
+// ─── View & mode toggles ──────────────────────────────────────────────────────
+function setView(v) {
+  viewMode = v;
+  document.getElementById('btn-2d').classList.toggle('active', v === '2d');
+  document.getElementById('btn-3d').classList.toggle('active', v === '3d');
+  document.getElementById('canvas-2d').style.display    = v === '2d' ? 'block' : 'none';
+  document.getElementById('container-3d').style.display = v === '3d' ? 'block' : 'none';
+  document.getElementById('mode-toggle').style.display  = v === '2d' ? 'flex'  : 'none';
+  // reset explore/path state when leaving 2D
+  if (v === '3d') {
+    selectedNode = null; neighborSet.clear();
+    pathSource = null; pathTarget = null;
+    pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
+    updatePanels();
+    if (!graph3d) requestAnimationFrame(() => requestAnimationFrame(init3D));
+  }
+  updateHint();
+  refreshActive();
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-explore').classList.toggle('active', m === 'explore');
+  document.getElementById('btn-path').classList.toggle('active', m === 'path');
+  selectedNode = null; neighborSet.clear();
+  pathSource = null; pathTarget = null;
+  pathNodes.clear(); pathEdgeSet.clear(); pathResult = [];
+  updatePanels();
+  updateHint();
+  refreshActive();
+}
+
+function refreshActive() {
+  if (viewMode === '2d') draw2D();
+  else refresh3D();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 2D RENDERER (D3 canvas)
+// ══════════════════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('canvas-2d');
+const ctx    = canvas.getContext('2d');
+let W, H;
+let simulation2d, quadtree, transform2d = d3.zoomIdentity;
+let alpha0 = null;
+
+function resize2D() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+}
+resize2D();
+window.addEventListener('resize', () => {
+  resize2D();
+  if (viewMode === '2d') draw2D();
+  if (graph3d) graph3d.width(window.innerWidth).height(window.innerHeight);
+});
+
+function init2D() {
+  const maxDeg = d3.max(nodes2d, d => d.degree);
+  nodes2d.forEach(n => { n.r = 2 + 8 * Math.sqrt(n.degree / maxDeg); });
+
+  simulation2d = d3.forceSimulation(nodes2d)
+    .force('link', d3.forceLink(links2d).id(d => d.id).distance(12).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-60).distanceMax(200))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide(d => d.r + 1))
+    .alphaDecay(0.02)
+    .on('tick', () => {
+      const a = simulation2d.alpha();
+      if (alpha0 === null) alpha0 = a;
+      const pct = Math.min(99, Math.round((1 - a / alpha0) * 100));
+      document.getElementById('progress-fill').style.width = pct + '%';
+      draw2D();
+    })
+    .on('end', () => {
+      document.getElementById('progress-fill').style.width = '100%';
+      setTimeout(() => document.getElementById('loading').classList.add('fade-out'), 300);
+      buildQuadtree();
+    });
+
+  const zoom = d3.zoom().scaleExtent([0.05, 12]).on('zoom', e => {
+    transform2d = e.transform; draw2D();
+  });
+  d3.select(canvas).call(zoom);
+
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = transform2d.invertX(e.clientX - rect.left);
+    const my = transform2d.invertY(e.clientY - rect.top);
+    const hit = quadtree ? quadtree.find(mx, my, 20 / transform2d.k) : null;
+    if (hit) handleNodeClick(hit);
+    else handleReset();
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = transform2d.invertX(e.clientX - rect.left);
+    const my = transform2d.invertY(e.clientY - rect.top);
+    canvas.style.cursor = (quadtree && quadtree.find(mx, my, 20 / transform2d.k)) ? 'pointer' : 'crosshair';
+  });
+}
+
+function buildQuadtree() {
+  quadtree = d3.quadtree().x(d => d.x).y(d => d.y).addAll(nodes2d);
+}
+
+function draw2D() {
   ctx.save();
   ctx.clearRect(0, 0, W, H);
-  ctx.translate(transform.x, transform.y);
-  ctx.scale(transform.k, transform.k);
+  ctx.translate(transform2d.x, transform2d.y);
+  ctx.scale(transform2d.k, transform2d.k);
 
-  if (mode === 'explore') drawExplore();
-  else drawPath();
+  if (mode === 'explore') drawExplore2D();
+  else drawPath2D();
 
   ctx.globalAlpha = 1;
   ctx.restore();
 }
 
-function drawExplore() {
+function drawExplore2D() {
   const hasSel = selectedNode !== null;
+  ctx.lineWidth = 0.5 / transform2d.k;
 
-  ctx.lineWidth = 0.5 / transform.k;
   if (!hasSel) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath();
-    for (const l of links) {
+    for (const l of links2d) {
       if (l.source.x == null) continue;
-      ctx.moveTo(l.source.x, l.source.y);
-      ctx.lineTo(l.target.x, l.target.y);
+      ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y);
     }
     ctx.stroke();
   } else {
     ctx.strokeStyle = 'rgba(255,255,255,0.02)';
     ctx.beginPath();
-    for (const l of links) {
+    for (const l of links2d) {
       if (l.source.x == null) continue;
       if (l.source.id !== selectedNode.id && l.target.id !== selectedNode.id) {
-        ctx.moveTo(l.source.x, l.source.y);
-        ctx.lineTo(l.target.x, l.target.y);
+        ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y);
       }
     }
     ctx.stroke();
-
-    ctx.lineWidth = 1.2 / transform.k;
+    ctx.lineWidth = 1.2 / transform2d.k;
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.beginPath();
-    for (const l of links) {
+    for (const l of links2d) {
       if (l.source.x == null) continue;
       if (l.source.id === selectedNode.id || l.target.id === selectedNode.id) {
-        ctx.moveTo(l.source.x, l.source.y);
-        ctx.lineTo(l.target.x, l.target.y);
+        ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y);
       }
     }
     ctx.stroke();
   }
 
-  for (const n of nodes) {
+  for (const n of nodes2d) {
     if (n.x == null) continue;
-    const color = nodeColor(n.community);
+    const color = communityColor(n.community);
     let alpha = 0.85, scale = 1;
     if (hasSel) {
-      if (n === selectedNode) { alpha = 1; scale = 1.6; }
-      else if (neighborSet.has(n.id)) { alpha = 0.9; scale = 1.1; }
-      else { alpha = 0.08; scale = 1; }
+      if (n === selectedNode)         { alpha = 1;    scale = 1.6; }
+      else if (neighborSet.has(n.id)) { alpha = 0.9;  scale = 1.1; }
+      else                            { alpha = 0.08; }
     }
-    const r = n.r * scale;
     ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    if (n === selectedNode) drawGlow(n.x, n.y, r, color);
+    ctx.arc(n.x, n.y, n.r * scale, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    if (n === selectedNode) drawGlow2D(n.x, n.y, n.r * scale, color);
   }
 }
 
-function drawPath() {
+function drawPath2D() {
   const hasPath = pathResult.length > 0;
-  const hasSource = pathSource !== null;
+  const hasSrc  = pathSource !== null;
 
-  // Edges — dim all, then overlay path edges
-  ctx.lineWidth = 0.4 / transform.k;
+  ctx.lineWidth = 0.4 / transform2d.k;
   ctx.strokeStyle = 'rgba(255,255,255,0.02)';
   ctx.beginPath();
-  for (const l of links) {
+  for (const l of links2d) {
     if (l.source.x == null) continue;
     const key = Math.min(l.source.id, l.target.id) + '-' + Math.max(l.source.id, l.target.id);
-    if (!pathEdgeSet.has(key)) {
-      ctx.moveTo(l.source.x, l.source.y);
-      ctx.lineTo(l.target.x, l.target.y);
-    }
+    if (!pathEdgeSet.has(key)) { ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); }
   }
   ctx.stroke();
 
   if (hasPath) {
-    ctx.lineWidth = 2 / transform.k;
+    ctx.lineWidth = 2 / transform2d.k;
     ctx.strokeStyle = 'rgba(255,255,255,0.7)';
     ctx.beginPath();
-    for (const l of links) {
+    for (const l of links2d) {
       if (l.source.x == null) continue;
       const key = Math.min(l.source.id, l.target.id) + '-' + Math.max(l.source.id, l.target.id);
-      if (pathEdgeSet.has(key)) {
-        ctx.moveTo(l.source.x, l.source.y);
-        ctx.lineTo(l.target.x, l.target.y);
-      }
+      if (pathEdgeSet.has(key)) { ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); }
     }
     ctx.stroke();
   }
 
-  // Nodes
-  for (const n of nodes) {
+  for (const n of nodes2d) {
     if (n.x == null) continue;
-
-    const isSource = pathSource && n.id === pathSource.id;
-    const isTarget = pathTarget && n.id === pathTarget.id;
-    const onPath   = pathNodes.has(n.id) && !isSource && !isTarget;
-
-    let color = nodeColor(n.community);
-    let alpha = 0.07;
-    let scale = 1;
-
-    if (isSource) { color = COLOR_SOURCE; alpha = 1; scale = 1.8; }
-    else if (isTarget) { color = COLOR_TARGET; alpha = 1; scale = 1.8; }
-    else if (onPath) { color = COLOR_MID; alpha = 0.95; scale = 1.3; }
-    else if (!hasSource) { alpha = 0.75; } // nothing selected yet — show all normally
-    else if (!pathTarget && !hasPath) { alpha = 0.07; } // source picked, waiting for target
-
-    const r = n.r * scale;
+    const isSrc = pathSource && n.id === pathSource.id;
+    const isTgt = pathTarget && n.id === pathTarget.id;
+    const onPath = pathNodes.has(n.id) && !isSrc && !isTgt;
+    let color = communityColor(n.community), alpha = 0.07, scale = 1;
+    if      (isSrc)           { color = COLOR_SOURCE; alpha = 1;    scale = 1.8; }
+    else if (isTgt)           { color = COLOR_TARGET; alpha = 1;    scale = 1.8; }
+    else if (onPath)          { color = COLOR_MID;    alpha = 0.95; scale = 1.3; }
+    else if (!hasSrc)         { alpha = 0.75; }
+    else if (!pathTarget)     { alpha = 0.4;  }
     ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-
-    if (isSource) drawGlow(n.x, n.y, r, COLOR_SOURCE);
-    if (isTarget) drawGlow(n.x, n.y, r, COLOR_TARGET);
+    ctx.arc(n.x, n.y, n.r * scale, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    if (isSrc) drawGlow2D(n.x, n.y, n.r * scale, COLOR_SOURCE);
+    if (isTgt) drawGlow2D(n.x, n.y, n.r * scale, COLOR_TARGET);
   }
 }
 
-function drawGlow(x, y, r, color) {
+function drawGlow2D(x, y, r, color) {
   ctx.globalAlpha = 0.25;
   ctx.beginPath();
   ctx.arc(x, y, r * 2.8, 0, Math.PI * 2);
   const grad = ctx.createRadialGradient(x, y, r, x, y, r * 2.8);
-  grad.addColorStop(0, color);
-  grad.addColorStop(1, 'transparent');
-  ctx.fillStyle = grad;
-  ctx.fill();
+  grad.addColorStop(0, color); grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad; ctx.fill();
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 3D RENDERER (ForceGraph3D)
+// ══════════════════════════════════════════════════════════════════════════════
+let graph3d = null;
+
+function init3D() {
+  const maxDeg = Math.max(...nodes3d.map(n => n.degree));
+
+  graph3d = ForceGraph3D()(document.getElementById('container-3d'))
+    .width(window.innerWidth)
+    .height(window.innerHeight)
+    .backgroundColor('#08080f')
+    .graphData({ nodes: nodes3d, links: links3d })
+    .nodeVal(n => 1 + (n.degree / maxDeg) * 40)
+    .nodeColor(getNodeColor3D)
+    .nodeOpacity(1)
+    .nodeResolution(8)
+    .linkColor(getLinkColor3D)
+    .linkWidth(getLinkWidth3D)
+    .linkOpacity(1)
+    .onNodeClick(handleNodeClick)
+    .onBackgroundClick(handleReset);
+}
+
+function getNodeColor3D(node) {
+  if (mode === 'explore') {
+    if (!selectedNode)              return communityColor(node.community);
+    if (node.id === selectedNode.id) return '#ffffff';
+    if (neighborSet.has(node.id))   return communityColor(node.community);
+    return COLOR_DIM;
+  } else {
+    if (pathSource && node.id === pathSource.id) return COLOR_SOURCE;
+    if (pathTarget && node.id === pathTarget.id) return COLOR_TARGET;
+    if (pathNodes.has(node.id))                  return COLOR_MID;
+    if (!pathSource)                             return communityColor(node.community);
+    return COLOR_DIM;
+  }
+}
+
+function getLinkColor3D(link) {
+  const s = typeof link.source === 'object' ? link.source.id : link.source;
+  const t = typeof link.target === 'object' ? link.target.id : link.target;
+  if (mode === 'explore') {
+    if (!selectedNode)                                     return 'rgba(255,255,255,0.18)';
+    if (s === selectedNode.id || t === selectedNode.id)    return 'rgba(255,255,255,0.85)';
+    return 'rgba(255,255,255,0.03)';
+  } else {
+    if (pathEdgeSet.has(Math.min(s,t)+'-'+Math.max(s,t))) return 'rgba(255,255,255,0.9)';
+    if (!pathSource)                                       return 'rgba(255,255,255,0.18)';
+    return 'rgba(255,255,255,0.03)';
+  }
+}
+
+function getLinkWidth3D(link) {
+  const s = typeof link.source === 'object' ? link.source.id : link.source;
+  const t = typeof link.target === 'object' ? link.target.id : link.target;
+  if (mode === 'path' && pathEdgeSet.has(Math.min(s,t)+'-'+Math.max(s,t))) return 2;
+  if (mode === 'explore' && selectedNode && (s === selectedNode.id || t === selectedNode.id)) return 1.5;
+  return 0;
+}
+
+function refresh3D() {
+  if (!graph3d) return;
+  graph3d.nodeColor(getNodeColor3D).linkColor(getLinkColor3D).linkWidth(getLinkWidth3D);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Boot
+// ──────────────────────────────────────────────────────────────────────────────
+fetch('graph.json')
+  .then(r => r.json())
+  .then(data => {
+    // 2D arrays — will be mutated by D3's force simulation
+    nodes2d = data.nodes.map(n => ({ ...n, neighbors: [] }));
+    links2d = data.links.map(l => ({ source: l.source, target: l.target }));
+
+    // 3D arrays — completely independent copies, kept clean for ForceGraph3D
+    nodes3d = data.nodes.map(n => ({ id: n.id, degree: n.degree, community: n.community }));
+    links3d = data.links.map(l => ({ source: l.source, target: l.target }));
+
+    // Build adjacency on 2D nodes for BFS
+    nodeById = new Map(nodes2d.map(n => [n.id, n]));
+    links2d.forEach(l => {
+      const s = nodeById.get(l.source);
+      const t = nodeById.get(l.target);
+      if (s && t) { s.neighbors.push(t.id); t.neighbors.push(s.id); }
+    });
+
+    updateHint();
+    init2D();
+  });
 </script>
 </body>
 </html>
